@@ -1,0 +1,53 @@
+run:
+  timeout: 5m
+  tests: true
+  modules-download-mode: readonly
+
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+    check-blank: false
+  
+  govet:
+    enable-all: true
+    disable:
+      - fieldalignment  # 構造体フィールドの最適化は環境依存のため無効化
+  
+  staticcheck:
+    checks: ["all"]
+
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - performance
+      - style
+    disabled-checks:
+      - commentFormatting
+      - whyNoLint
+      - ifElseChain  # 可読性の観点から一部のif-elseチェーンはそのまま維持
+
+  revive:
+    ignore-generated-header: true
+
+linters:
+  enable:
+    - errcheck      # エラーチェック漏れを検出
+    - staticcheck   # 静的解析による問題検出
+    - unused        # 未使用のコード検出
+    - govet         # go vet による問題検出
+    - ineffassign   # 無効な代入を検出
+    - misspell      # スペルミスを検出
+    - revive        # 命名規則とコーディング規約のチェック
+    - gocritic      # コードレビューのベストプラクティス
+  
+  disable:
+    - exhaustive    # すべてのswitch caseを要求するのは過度
+    - varnamelen    # 変数名の長さ制限は文脈依存
+
+issues:
+  exclude-rules:
+    # テストファイルでは変数名規則を緩和（アンダースコア使用や大文字使用を許容）
+    - path: "_test\\.go$"
+      text: "var-naming"
+      linters:
+        - revive

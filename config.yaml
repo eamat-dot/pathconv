@@ -1,0 +1,5 @@
+output_path: "output/result.md"
+
+output_templates:
+  console: "./templates/console.tmpl"
+  markdown: "./templates/markdown.tmpl"

@@ -1,0 +1,148 @@
+version: '3'
+
+# デバッグ用Taskfileを読み込む（存在する場合）
+# Taskfile.debug.yml は .gitignore に含まれているため、個人用設定として自由に編集可能
+# サンプルは Taskfile.debug.yml.example を参照
+includes:
+  debug:
+    taskfile: ./Taskfile.debug.yml
+    optional: true
+
+vars:
+  BINARY_NAME: pathconv
+  BINARY_PATH: ./bin/{{.BINARY_NAME}}{{exeExt}}
+
+# env:
+#   BOOK_API_CONFIG: ./.book-api.yml
+
+tasks:
+  default:
+    deps:
+      - help
+
+  deps:
+    desc: 依存パッケージをインストール
+    sources:
+      - go.mod
+      - go.sum
+    cmds:
+      - go mod download
+      - go mod tidy
+
+  build:
+    desc: アプリケーションをビルド(ソース変更時) >> {{.BINARY_PATH}}
+    deps: [deps]
+    sources:
+      - '**/*.go'
+    generates:
+      - '{{.BINARY_PATH}}'
+    cmds:
+      - mkdir -p bin
+      - go build -o {{.BINARY_PATH}} .
+
+  build:force:
+    desc: アプリケーションをビルド(強制)
+    deps: [clean]
+    cmds:
+      - task: build
+
+  run:
+    desc: アプリケーションを実行  >> go run . [ARGS]
+    cmds:
+      - >
+        {{.EXEC  | default "go run ." }}
+        {{.ARGS  | default ""         }}
+
+  run:build:
+    desc: アプリケーションをビルドして実行 ({{.BINARY_NAME}} search …)
+    deps: [build]
+    cmds:
+      - task: run
+        vars:
+          EXEC: '{{.BINARY_PATH}}'
+
+  run:prod:
+    aliases: [rp,exe]
+    desc: アプリケーションを本番モードで実行 ({{.BINARY_NAME}} search …)
+    cmds:
+      - task: run
+        vars:
+          EXEC: '{{.BINARY_PATH}}'
+
+  test:
+    desc: "テストを実行"
+    cmds:
+      - go test -v ./...
+
+  test-coverage:
+    desc: "カバレッジ付きでテストを実行"
+    cmds:
+      - go test -v -coverprofile coverage.out ./...
+      - go tool cover -html coverage.out -o coverage.html
+
+  lint:
+    desc: "コードの静的解析"
+    cmds:
+      - golangci-lint run
+      - go vet ./...
+      - go fmt ./...
+
+  act:
+    desc: "ローカルでGitHub Actions CIを実行 (actが必要)"
+    cmds:
+      - act push -j ci
+
+  act:lint:
+    desc: "ローカルでgolangci-lintのみ実行 (actが必要)"
+    cmds:
+      - act push -j ci --job "Lint, Test, Build" -s GITHUB_TOKEN={{.GITHUB_TOKEN}}
+
+  clean:
+    desc: 'ビルド成果物を削除 (bin/ 直下のファイルのみ削除)'
+    cmds:
+      - go clean
+      - rm -rf ./bin/{{.BINARY_NAME}}{{exeExt}}
+
+  dev:
+    desc: "ファイル変更を監視して自動実行"
+    cmds:
+      - task: watch
+
+  watch:
+    desc: "ファイル変更を監視"
+    cmds:
+      - task: run
+      # - |
+      #   echo "ファイル監視中... (Ctrl+Cで終了)"
+      #   task: run
+    watch: true
+    sources:
+      - "**/*.go"
+
+  build:prod:
+    desc: "本番環境用にビルド（最適化）"
+    deps: [clean, deps]
+    cmds:
+      - mkdir -p bin
+      - go build -ldflags "-s -w" -o {{.BINARY_PATH}} .
+
+  all:
+    desc: "リント、テスト、ビルドを順次実行"
+    cmds:
+      - task: lint
+      - task: test
+      - task: build
+
+  ci:
+    desc: "CI相当のチェックを実行 (lint, test, build)"
+    cmds:
+      - task: lint
+      - task: test
+      - task: build
+
+  ci:local:
+    desc: "ローカルでCI全体を実行 (act + test + build)"
+    cmds:
+      - task: act
+      - task: test
+      - task: build
